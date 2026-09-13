@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from redis.asyncio import Redis
 
@@ -51,4 +51,4 @@ class PresenceStore:
         return datetime.fromisoformat(raw)
 
     async def _touch_last_seen(self, user_id: str) -> None:
-        await self._redis.set(last_seen_key(user_id), datetime.now(UTC).isoformat())
+        await self._redis.set(last_seen_key(user_id), datetime.now(timezone.utc).isoformat())
