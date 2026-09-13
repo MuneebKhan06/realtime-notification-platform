@@ -40,7 +40,7 @@ class Subscriber:
             except asyncio.CancelledError:
                 pass
         if self._pubsub is not None:
-            await self._pubsub.close()
+            await self._pubsub.aclose()
 
     async def _listen(self) -> None:
         assert self._pubsub is not None

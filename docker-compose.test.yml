@@ -43,6 +43,7 @@ services:
       INSTANCE_ID: instance-1
       DATABASE_URL: postgresql+asyncpg://notify:notify@postgres-test:5432/notifications_test
       REDIS_URL: redis://redis-test:6379/0
+      JWT_SECRET_KEY: integration-test-secret
     ports:
       - "8001:8000"
     depends_on:
@@ -61,6 +62,7 @@ services:
       INSTANCE_ID: instance-2
       DATABASE_URL: postgresql+asyncpg://notify:notify@postgres-test:5432/notifications_test
       REDIS_URL: redis://redis-test:6379/0
+      JWT_SECRET_KEY: integration-test-secret
     ports:
       - "8002:8000"
     depends_on:
