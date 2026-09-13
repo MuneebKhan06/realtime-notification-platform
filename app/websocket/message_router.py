@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import ValidationError
 
+from app.core.metrics import rate_limited_total, ws_messages_received_total
 from app.core.rate_limiter import RateLimiter
 from app.presence.presence_manager import PresenceManager
 from app.schemas.ws_messages import (
@@ -37,10 +38,13 @@ class MessageRouter:
         self._on_read_receipt = on_read_receipt
 
     async def route(self, user_id: str, connection_id: str, raw_message: dict) -> dict | None:
+        message_type = raw_message.get("type", "unknown")
+        ws_messages_received_total.labels(message_type=message_type).inc()
+
         if not await self._rate_limiter.allow(connection_id):
+            rate_limited_total.inc()
             return RateLimitedMessage().model_dump()
 
-        message_type = raw_message.get("type")
         try:
             if message_type == "heartbeat":
                 HeartbeatMessage.model_validate(raw_message)

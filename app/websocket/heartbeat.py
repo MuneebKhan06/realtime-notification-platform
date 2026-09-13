@@ -16,7 +16,9 @@ class HeartbeatHandler:
     reconciliation loop below exists to catch.
     """
 
-    def __init__(self, presence: PresenceManager, registry: InstanceRegistry, ttl_seconds: int) -> None:
+    def __init__(
+        self, presence: PresenceManager, registry: InstanceRegistry, ttl_seconds: int
+    ) -> None:
         self._presence = presence
         self._registry = registry
         self._ttl_seconds = ttl_seconds
