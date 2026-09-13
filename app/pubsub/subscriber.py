@@ -50,9 +50,13 @@ class Subscriber:
             try:
                 payload = json.loads(message["data"])
             except (json.JSONDecodeError, TypeError):
-                logger.warning("Discarding malformed pubsub message on instance %s", self._instance_id)
+                logger.warning(
+                    "Discarding malformed pubsub message on instance %s", self._instance_id
+                )
                 continue
             try:
                 await self._handler(payload)
             except Exception:
-                logger.exception("Handler failed for pubsub message on instance %s", self._instance_id)
+                logger.exception(
+                    "Handler failed for pubsub message on instance %s", self._instance_id
+                )

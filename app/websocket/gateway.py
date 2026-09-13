@@ -25,7 +25,9 @@ async def websocket_endpoint(websocket: WebSocket, ticket: str) -> None:
     connection_id = str(uuid.uuid4())
 
     state.connection_manager.add(user_id, websocket)
-    await state.instance_registry.register(user_id, state.settings.instance_id, state.settings.presence_ttl_seconds)
+    await state.instance_registry.register(
+        user_id, state.settings.instance_id, state.settings.presence_ttl_seconds
+    )
     await state.presence_manager.mark_online(user_id)
 
     try:
