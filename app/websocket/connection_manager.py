@@ -2,6 +2,8 @@ import logging
 
 from fastapi import WebSocket
 
+from app.core.metrics import active_connections
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,9 +20,11 @@ class ConnectionManager:
 
     def add(self, user_id: str, websocket: WebSocket) -> None:
         self._connections[user_id] = websocket
+        active_connections.set(len(self._connections))
 
     def remove(self, user_id: str) -> None:
         self._connections.pop(user_id, None)
+        active_connections.set(len(self._connections))
 
     def get(self, user_id: str) -> WebSocket | None:
         return self._connections.get(user_id)
