@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -61,7 +61,9 @@ class MessageRouter:
 
             if message_type == "read_receipt":
                 receipt = ReadReceiptMessage.model_validate(raw_message)
-                await self._on_read_receipt(receipt.notification_id, user_id, datetime.now(UTC))
+                await self._on_read_receipt(
+                    receipt.notification_id, user_id, datetime.now(timezone.utc)
+                )
                 return None
 
             return ErrorMessage(detail=f"Unknown message type: {message_type}").model_dump()
