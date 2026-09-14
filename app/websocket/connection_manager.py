@@ -51,3 +51,22 @@ class ConnectionManager:
             logger.exception("Failed to deliver message to user %s, dropping connection", user_id)
             self.remove(user_id)
             return False
+
+    async def close_all(self, code: int, reason: str) -> list[str]:
+        """Closes every locally held connection, for a graceful instance shutdown.
+
+        Returns the user_ids that were closed, so the caller can also clear
+        their instance registry and presence entries instead of leaving
+        clients to wait out the TTL for an instance that is not coming back.
+        """
+        user_ids = self.connected_user_ids()
+        for user_id in user_ids:
+            websocket = self._connections.pop(user_id, None)
+            if websocket is None:
+                continue
+            try:
+                await websocket.close(code=code, reason=reason)
+            except Exception:
+                logger.exception("Failed to close connection for user %s during shutdown", user_id)
+        active_connections.set(len(self._connections))
+        return user_ids

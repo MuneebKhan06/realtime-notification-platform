@@ -92,6 +92,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        disconnected_user_ids = await connection_manager.close_all(
+            code=1001, reason="Server shutting down"
+        )
+        for user_id in disconnected_user_ids:
+            await instance_registry.unregister(user_id)
+            await presence_manager.mark_offline(user_id)
+
         await reconciliation_loop.stop()
         await subscriber.stop()
         await redis.aclose()
