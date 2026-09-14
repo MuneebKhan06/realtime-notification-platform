@@ -475,8 +475,18 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env
-pytest tests/ -v -m "not integration"
-ruff check app/ tests/
+make check   # lint, type check, unit tests
+```
+
+`make check` runs ruff, mypy, and the unit test suite together, the same
+checks CI runs. See the Makefile for individual targets (`lint`,
+`typecheck`, `test-unit`, `test-integration`, `up`, `down`, `migrate`).
+
+Optionally install the pre-commit hooks so lint and formatting run before
+each commit:
+
+```bash
+pre-commit install
 ```
 
 ### Integration tests (two-instance delivery)
