@@ -188,3 +188,30 @@ async def test_get_history_returns_notifications_for_user(client, monkeypatch):
     assert response.status_code == 200
     assert len(body) == 1
     assert body[0]["notification_id"] == str(row.notification_id)
+
+
+async def test_get_history_forwards_the_before_cursor_and_limit(client, monkeypatch):
+    user_id = uuid.uuid4()
+    before = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    fake_repository = AsyncMock()
+    fake_repository.get_history.return_value = []
+
+    monkeypatch.setattr(history, "get_session", _fake_session_scope())
+    monkeypatch.setattr(history, "NotificationRepository", lambda session: fake_repository)
+
+    response = await client.get(
+        "/notifications/history",
+        params={"user_id": str(user_id), "limit": 10, "before": before.isoformat()},
+    )
+
+    assert response.status_code == 200
+    fake_repository.get_history.assert_awaited_once_with(user_id, 10, before)
+
+
+async def test_get_history_rejects_a_limit_above_the_maximum(client):
+    response = await client.get(
+        "/notifications/history", params={"user_id": str(uuid.uuid4()), "limit": 500}
+    )
+
+    assert response.status_code == 422
