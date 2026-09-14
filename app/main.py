@@ -10,6 +10,7 @@ from redis.asyncio import Redis
 from app.api.routes import auth, health, history, metrics, notifications, presence
 from app.config import get_settings
 from app.core.idempotency import IdempotencyGuard
+from app.core.logging_config import configure_logging
 from app.core.rate_limiter import RateLimiter
 from app.db.connection import dispose_engine, get_session
 from app.db.repository import NotificationRepository
@@ -17,14 +18,14 @@ from app.presence.presence_manager import PresenceManager
 from app.presence.presence_store import PresenceStore
 from app.pubsub.instance_registry import InstanceRegistry
 from app.pubsub.publisher import Publisher
-from app.pubsub.subscriber import Subscriber
+from app.pubsub.subscriber import MessageHandler, Subscriber
 from app.websocket.auth_handshake import WSTicketAuth
 from app.websocket.connection_manager import ConnectionManager
 from app.websocket.gateway import router as gateway_router
 from app.websocket.heartbeat import HeartbeatHandler, ReconciliationLoop
 from app.websocket.message_router import MessageRouter
 
-logging.basicConfig(level=get_settings().log_level)
+configure_logging(get_settings().log_level, get_settings().instance_id)
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +35,7 @@ async def _mark_read(notification_id: UUID, user_id: str, read_at: datetime) -> 
         await repository.mark_read(notification_id, read_at)
 
 
-def _make_local_delivery_handler(connection_manager: ConnectionManager):
+def _make_local_delivery_handler(connection_manager: ConnectionManager) -> MessageHandler:
     async def deliver(payload: dict) -> None:
         user_id = payload["user_id"]
         await connection_manager.send_json(

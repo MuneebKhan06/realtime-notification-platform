@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from redis.asyncio import Redis
+from redis.asyncio.client import PubSub
 
 from app.pubsub.publisher import instance_channel
 
@@ -25,7 +26,7 @@ class Subscriber:
         self._instance_id = instance_id
         self._handler = handler
         self._task: asyncio.Task | None = None
-        self._pubsub = None
+        self._pubsub: PubSub | None = None
 
     async def start(self) -> None:
         self._pubsub = self._redis.pubsub()
