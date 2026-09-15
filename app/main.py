@@ -11,6 +11,7 @@ from app.api.routes import auth, health, history, metrics, notifications, presen
 from app.config import get_settings
 from app.core.idempotency import IdempotencyGuard
 from app.core.logging_config import configure_logging
+from app.core.metrics import read_receipts_recorded_total
 from app.core.rate_limiter import RateLimiter
 from app.db.connection import dispose_engine, get_session
 from app.db.repository import NotificationRepository
@@ -32,7 +33,8 @@ logger = logging.getLogger(__name__)
 async def _mark_read(notification_id: UUID, user_id: str, read_at: datetime) -> None:
     async with get_session() as session:
         repository = NotificationRepository(session)
-        await repository.mark_read(notification_id, read_at)
+        await repository.mark_read(notification_id, UUID(user_id), read_at)
+    read_receipts_recorded_total.inc()
 
 
 def _make_local_delivery_handler(connection_manager: ConnectionManager) -> MessageHandler:

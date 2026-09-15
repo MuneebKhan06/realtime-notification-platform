@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Notification
+from app.db.models import Notification, ReadReceipt
 
 
 class NotificationRepository:
@@ -47,13 +47,30 @@ class NotificationRepository:
         await self._session.execute(stmt)
         await self._session.commit()
 
-    async def mark_read(self, notification_id: uuid.UUID, read_at: datetime) -> None:
-        stmt = (
+    async def mark_read(
+        self, notification_id: uuid.UUID, user_id: uuid.UUID, read_at: datetime
+    ) -> None:
+        """Marks a notification as read and records a read receipt for it.
+
+        Both writes happen in one transaction: the notification's read_at is
+        the fast-path check used by the unread backlog query, while the
+        read_receipts row is the durable, per-user audit trail of when it
+        was acknowledged.
+        """
+        update_stmt = (
             update(Notification)
             .where(Notification.notification_id == notification_id)
             .values(read_at=read_at)
         )
-        await self._session.execute(stmt)
+        await self._session.execute(update_stmt)
+
+        insert_stmt = pg_insert(ReadReceipt).values(
+            notification_id=notification_id,
+            user_id=user_id,
+            read_at=read_at,
+        )
+        await self._session.execute(insert_stmt)
+
         await self._session.commit()
 
     async def get_unread_backlog(self, user_id: uuid.UUID, limit: int) -> list[Notification]:

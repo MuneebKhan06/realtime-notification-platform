@@ -26,6 +26,11 @@ rate_limited_total = Counter(
     "Inbound WebSocket messages dropped by the rate limiter",
 )
 
+read_receipts_recorded_total = Counter(
+    "notification_gateway_read_receipts_recorded_total",
+    "Read receipts persisted for delivered notifications",
+)
+
 
 def render_latest() -> tuple[bytes, str]:
     return generate_latest(), CONTENT_TYPE_LATEST
