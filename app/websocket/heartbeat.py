@@ -78,3 +78,44 @@ class ReconciliationLoop:
                     self._instance_id,
                     owner,
                 )
+
+
+class InstanceLivenessLoop:
+    """Keeps this instance's own liveness key refreshed in Redis.
+
+    This is the fix for the failure mode documented in the README under
+    "What I Would Do Differently": a crashed instance leaves stale
+    user_id -> instance_id registry entries until their TTL expires. The
+    publisher checks this separate liveness key before trusting a registry
+    entry, so a crash is detected as soon as this key's short TTL lapses,
+    instead of waiting on the longer per-user presence TTL.
+    """
+
+    def __init__(self, registry: InstanceRegistry, instance_id: str, ttl_seconds: int) -> None:
+        self._registry = registry
+        self._instance_id = instance_id
+        self._ttl_seconds = ttl_seconds
+        self._interval_seconds = max(1, ttl_seconds // 3)
+        self._task: asyncio.Task | None = None
+
+    async def start(self) -> None:
+        await self._registry.mark_alive(self._instance_id, self._ttl_seconds)
+        self._task = asyncio.create_task(self._run())
+
+    async def stop(self) -> None:
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+
+    async def _run(self) -> None:
+        while True:
+            await asyncio.sleep(self._interval_seconds)
+            try:
+                await self._registry.mark_alive(self._instance_id, self._ttl_seconds)
+            except Exception:
+                logger.exception(
+                    "Failed to refresh liveness key for instance %s", self._instance_id
+                )

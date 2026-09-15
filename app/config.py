@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     presence_ttl_seconds: int = 30
     heartbeat_interval_seconds: int = 15
 
+    instance_liveness_ttl_seconds: int = 15
+
     backlog_limit: int = 100
 
     rate_limit_messages: int = 50

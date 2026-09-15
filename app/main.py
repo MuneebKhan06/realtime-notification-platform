@@ -24,7 +24,7 @@ from app.pubsub.subscriber import MessageHandler, Subscriber
 from app.websocket.auth_handshake import WSTicketAuth
 from app.websocket.connection_manager import ConnectionManager
 from app.websocket.gateway import router as gateway_router
-from app.websocket.heartbeat import HeartbeatHandler, ReconciliationLoop
+from app.websocket.heartbeat import HeartbeatHandler, InstanceLivenessLoop, ReconciliationLoop
 from app.websocket.message_router import MessageRouter
 
 configure_logging(get_settings().log_level, get_settings().instance_id)
@@ -83,6 +83,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings.instance_id,
         settings.heartbeat_interval_seconds * 2,
     )
+    liveness_loop = InstanceLivenessLoop(
+        instance_registry, settings.instance_id, settings.instance_liveness_ttl_seconds
+    )
 
     app.state.settings = settings
     app.state.redis = redis
@@ -98,6 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     await subscriber.start()
     reconciliation_loop.start()
+    await liveness_loop.start()
     logger.info("Gateway instance %s ready", settings.instance_id)
 
     try:
@@ -110,6 +114,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await instance_registry.unregister(user_id)
             await presence_manager.mark_offline(user_id)
 
+        await liveness_loop.stop()
         await reconciliation_loop.stop()
         await subscriber.stop()
         await redis.aclose()
