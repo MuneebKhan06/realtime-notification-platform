@@ -32,7 +32,11 @@ def decode_user_id(request: Request, credentials: HTTPAuthorizationCredentials) 
     return user_id
 
 
-@router.post("/auth/ws-ticket", response_model=WSTicketResponse)
+@router.post(
+    "/auth/ws-ticket",
+    response_model=WSTicketResponse,
+    summary="Exchange a Bearer JWT for a single-use WebSocket ticket",
+)
 async def issue_ws_ticket(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),

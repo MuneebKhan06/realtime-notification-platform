@@ -7,7 +7,7 @@ from app.schemas.notifications import HealthCheck
 router = APIRouter()
 
 
-@router.get("/health", response_model=HealthCheck)
+@router.get("/health", response_model=HealthCheck, summary="Instance health and dependency status")
 async def health_check(request: Request) -> HealthCheck:
     state = request.app.state
 

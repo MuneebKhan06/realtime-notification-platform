@@ -10,7 +10,11 @@ from app.schemas.notifications import NotificationHistoryPage, NotificationRead
 router = APIRouter()
 
 
-@router.get("/notifications/history", response_model=NotificationHistoryPage)
+@router.get(
+    "/notifications/history",
+    response_model=NotificationHistoryPage,
+    summary="Paginated notification history for a user",
+)
 async def get_history(
     user_id: UUID,
     limit: int = Query(default=50, ge=1, le=200),

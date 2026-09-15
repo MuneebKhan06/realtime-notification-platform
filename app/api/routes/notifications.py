@@ -10,7 +10,11 @@ from app.schemas.notifications import NotificationCreate, NotificationCreateResp
 router = APIRouter()
 
 
-@router.post("/notifications", response_model=NotificationCreateResponse)
+@router.post(
+    "/notifications",
+    response_model=NotificationCreateResponse,
+    summary="Trigger a notification for a user",
+)
 async def create_notification(
     body: NotificationCreate, request: Request
 ) -> NotificationCreateResponse:

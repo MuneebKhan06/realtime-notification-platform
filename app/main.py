@@ -121,16 +121,37 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await dispose_engine()
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="Real-Time Notification & Presence Platform", lifespan=lifespan)
+OPENAPI_TAGS = [
+    {
+        "name": "websocket",
+        "description": "Live connection endpoint for notifications and presence.",
+    },
+    {"name": "auth", "description": "Ticket exchange used to authenticate the WebSocket upgrade."},
+    {"name": "notifications", "description": "Trigger and browse notifications."},
+    {"name": "presence", "description": "Online/away/offline status lookups."},
+    {"name": "ops", "description": "Health and Prometheus metrics for operators."},
+]
 
-    app.include_router(gateway_router)
-    app.include_router(auth.router)
-    app.include_router(notifications.router)
-    app.include_router(presence.router)
-    app.include_router(history.router)
-    app.include_router(health.router)
-    app.include_router(metrics.router)
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Real-Time Notification & Presence Platform",
+        description=(
+            "WebSocket gateway for live notifications and presence, backed by "
+            "Redis Pub/Sub for cross-instance fan-out and PostgreSQL for durable history."
+        ),
+        version="0.2.0",
+        lifespan=lifespan,
+        openapi_tags=OPENAPI_TAGS,
+    )
+
+    app.include_router(gateway_router, tags=["websocket"])
+    app.include_router(auth.router, tags=["auth"])
+    app.include_router(notifications.router, tags=["notifications"])
+    app.include_router(presence.router, tags=["presence"])
+    app.include_router(history.router, tags=["notifications"])
+    app.include_router(health.router, tags=["ops"])
+    app.include_router(metrics.router, tags=["ops"])
 
     return app
 

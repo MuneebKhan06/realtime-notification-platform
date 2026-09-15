@@ -5,7 +5,9 @@ from app.schemas.notifications import PresenceRead
 router = APIRouter()
 
 
-@router.get("/presence/{user_id}", response_model=PresenceRead)
+@router.get(
+    "/presence/{user_id}", response_model=PresenceRead, summary="Get a user's presence status"
+)
 async def get_presence(user_id: str, request: Request) -> PresenceRead:
     presence_manager = request.app.state.presence_manager
     info = await presence_manager.get(user_id)
