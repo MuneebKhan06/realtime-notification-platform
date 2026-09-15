@@ -444,6 +444,16 @@ Paginated notification history for a user.
 
 **Query parameters:** `user_id`, `limit` (default 50), `before` (cursor, timestamp)
 
+```json
+{
+  "notifications": [ { "notification_id": "uuid", "type": "message.received", "...": "..." } ],
+  "next_cursor": "2026-01-01T00:00:00Z"
+}
+```
+
+`next_cursor` is `null` once fewer than `limit` rows come back. Pass it as
+the next request's `before` to page further into the history.
+
 ### GET /presence/{user_id}
 
 ```json

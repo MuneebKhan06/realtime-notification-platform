@@ -182,12 +182,45 @@ async def test_get_history_returns_notifications_for_user(client, monkeypatch):
     monkeypatch.setattr(history, "get_session", _fake_session_scope())
     monkeypatch.setattr(history, "NotificationRepository", lambda session: fake_repository)
 
-    response = await client.get("/notifications/history", params={"user_id": str(row.user_id)})
+    response = await client.get(
+        "/notifications/history", params={"user_id": str(row.user_id), "limit": 50}
+    )
 
     body = response.json()
     assert response.status_code == 200
-    assert len(body) == 1
-    assert body[0]["notification_id"] == str(row.notification_id)
+    assert len(body["notifications"]) == 1
+    assert body["notifications"][0]["notification_id"] == str(row.notification_id)
+    assert body["next_cursor"] is None
+
+
+async def test_get_history_sets_next_cursor_when_a_full_page_is_returned(client, monkeypatch):
+    rows = []
+    for _ in range(2):
+        row = AsyncMock()
+        row.notification_id = uuid.uuid4()
+        row.user_id = uuid.uuid4()
+        row.type = "message.received"
+        row.payload = {}
+        row.created_at = datetime.now(timezone.utc)
+        row.delivered_live = True
+        row.read_at = None
+        rows.append(row)
+
+    fake_repository = AsyncMock()
+    fake_repository.get_history.return_value = rows
+
+    monkeypatch.setattr(history, "get_session", _fake_session_scope())
+    monkeypatch.setattr(history, "NotificationRepository", lambda session: fake_repository)
+
+    response = await client.get(
+        "/notifications/history", params={"user_id": str(uuid.uuid4()), "limit": 2}
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert len(body["notifications"]) == 2
+    next_cursor = datetime.fromisoformat(body["next_cursor"].replace("Z", "+00:00"))
+    assert next_cursor == rows[-1].created_at
 
 
 async def test_get_history_forwards_the_before_cursor_and_limit(client, monkeypatch):

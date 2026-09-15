@@ -30,6 +30,11 @@ class NotificationRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NotificationHistoryPage(BaseModel):
+    notifications: list[NotificationRead]
+    next_cursor: datetime | None
+
+
 class PresenceRead(BaseModel):
     user_id: str
     status: str
