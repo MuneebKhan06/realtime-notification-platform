@@ -41,6 +41,15 @@ async def create_notification(
 
         delivered_live = False
         owning_instance = await state.instance_registry.lookup(str(body.user_id))
+        if owning_instance is not None and not await state.instance_registry.is_alive(
+            owning_instance
+        ):
+            # The registry entry points at an instance that has stopped
+            # refreshing its own liveness key, most likely a crash rather
+            # than a graceful disconnect. Treat as offline and fall back to
+            # the PostgreSQL backlog rather than publishing into the void.
+            owning_instance = None
+
         if owning_instance is not None:
             await state.publisher.publish_to_instance(
                 owning_instance,

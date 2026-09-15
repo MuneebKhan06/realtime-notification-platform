@@ -150,6 +150,77 @@ async def test_create_notification_persists_and_reports_no_live_recipient(client
     fake_repository.mark_delivered_live.assert_not_awaited()
 
 
+async def test_create_notification_delivers_live_to_a_registered_and_alive_instance(
+    client, app, monkeypatch
+):
+    row = AsyncMock()
+    row.notification_id = uuid.uuid4()
+    row.user_id = uuid.uuid4()
+    row.type = "message.received"
+    row.payload = {}
+    row.created_at = datetime.now(timezone.utc)
+
+    fake_repository = AsyncMock()
+    fake_repository.create.return_value = row
+
+    monkeypatch.setattr(notifications, "get_session", _fake_session_scope())
+    monkeypatch.setattr(notifications, "NotificationRepository", lambda session: fake_repository)
+
+    await app.state.instance_registry.register(str(row.user_id), "instance-2", ttl_seconds=30)
+    await app.state.instance_registry.mark_alive("instance-2", ttl_seconds=15)
+
+    response = await client.post(
+        "/notifications",
+        json={
+            "notification_id": str(row.notification_id),
+            "user_id": str(row.user_id),
+            "type": "message.received",
+            "payload": {},
+        },
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["delivered_live"] is True
+    fake_repository.mark_delivered_live.assert_awaited_once_with(row.notification_id)
+
+
+async def test_create_notification_skips_delivery_to_a_registered_but_dead_instance(
+    client, app, monkeypatch
+):
+    row = AsyncMock()
+    row.notification_id = uuid.uuid4()
+    row.user_id = uuid.uuid4()
+    row.type = "message.received"
+    row.payload = {}
+    row.created_at = datetime.now(timezone.utc)
+
+    fake_repository = AsyncMock()
+    fake_repository.create.return_value = row
+
+    monkeypatch.setattr(notifications, "get_session", _fake_session_scope())
+    monkeypatch.setattr(notifications, "NotificationRepository", lambda session: fake_repository)
+
+    # Registered but never marked alive, simulating a crashed instance whose
+    # registry entries have not yet expired.
+    await app.state.instance_registry.register(str(row.user_id), "instance-2", ttl_seconds=30)
+
+    response = await client.post(
+        "/notifications",
+        json={
+            "notification_id": str(row.notification_id),
+            "user_id": str(row.user_id),
+            "type": "message.received",
+            "payload": {},
+        },
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["delivered_live"] is False
+    fake_repository.mark_delivered_live.assert_not_awaited()
+
+
 async def test_create_notification_is_idempotent_for_duplicate_ids(client, app):
     notification_id = str(uuid.uuid4())
     await app.state.idempotency_guard.seen_recently(uuid.UUID(notification_id))

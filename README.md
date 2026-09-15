@@ -589,21 +589,31 @@ Redis Cluster with consistent hashing on user_id, is the natural next step.
 
 ## What I Would Do Differently
 
-The instance registry currently has a failure mode I would address with
-more time: if a gateway instance crashes ungracefully (not a clean
-shutdown), its entries in the Redis registry are only cleaned up by TTL
-expiry, which can leave a stale `user:X -> instance:crashed` mapping for up
-to 30 seconds. During that window, notifications for user X are published
-to a dead instance's channel and silently lost from the live path (though
-still recoverable via PostgreSQL backlog on reconnect).
+**Update:** the instance-liveness gap described below is now fixed. Each
+gateway instance refreshes its own `instance:{id}:alive` key in Redis
+(`InstanceLivenessLoop`, every third of its TTL), and the notification
+publisher checks that key before trusting a registry entry, falling back to
+"treat as offline, rely on backlog" when the owning instance looks dead.
+This shrinks the degraded-delivery window from the 30-second presence TTL
+down to the instance liveness TTL (15 seconds by default), and it is a real
+extra Redis round trip on the hot path, exactly the cost called out below
+when this was still an open problem. The original reasoning is kept here
+for context.
 
-The correct fix is each gateway instance maintaining its own heartbeat key
-(`instance:{id}:alive`, refreshed every few seconds) and the notification
-publisher checking that key exists before trusting the registry entry,
-falling back to "treat as offline, rely on backlog" if the owning instance
-itself looks dead. I did not implement this because it adds a second TTL
-check to every notification's hot path, and for this project's scope, the
-30-second window of degraded (not lost) delivery was an acceptable
-simplification to document rather than solve. In a production system
-handling this at scale, I would implement the instance-liveness check from
-day one.
+---
+
+The instance registry originally had a failure mode I chose to document
+rather than fix first: if a gateway instance crashes ungracefully (not a
+clean shutdown), its entries in the Redis registry were only cleaned up by
+TTL expiry, which could leave a stale `user:X -> instance:crashed` mapping
+for up to 30 seconds. During that window, notifications for user X were
+published to a dead instance's channel and silently lost from the live path
+(though still recoverable via PostgreSQL backlog on reconnect).
+
+I initially skipped the fix because it adds a second TTL check to every
+notification's hot path, and for the project's early scope, the 30-second
+window of degraded (not lost) delivery was an acceptable simplification.
+Once the rest of the platform (persistence, WS gateway, REST API, tests,
+CI) was in place, this was the next highest-value correctness fix, so it
+came back in as a dedicated follow-up rather than being deferred
+indefinitely.
