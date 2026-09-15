@@ -319,6 +319,13 @@ aggressive but legitimate client.
 rate-limited client loses those specific messages rather than experiencing
 delay.
 
+The same token bucket module also protects `POST /notifications` on the
+REST side, keyed by the caller's IP address rather than a connection id, so
+a misbehaving upstream service cannot flood the persistence and fan-out
+path either. A caller over the limit gets a `429` instead of a dropped
+message, since this endpoint has no equivalent of "drop and keep going",
+every call is expected to either succeed or be retried by the caller.
+
 ---
 
 ## Getting Started
@@ -437,6 +444,10 @@ Trigger a notification for a user (called by other backend services).
   "payload": {}
 }
 ```
+
+Rate limited per caller IP (`API_RATE_LIMIT_REQUESTS` per
+`API_RATE_LIMIT_WINDOW_SECONDS`, default 100 per 10s). Returns `429` once
+exceeded.
 
 ### GET /notifications/history
 

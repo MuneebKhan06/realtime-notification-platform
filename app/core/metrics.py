@@ -1,4 +1,4 @@
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
 active_connections = Gauge(
     "notification_gateway_active_connections",
@@ -29,6 +29,13 @@ rate_limited_total = Counter(
 read_receipts_recorded_total = Counter(
     "notification_gateway_read_receipts_recorded_total",
     "Read receipts persisted for delivered notifications",
+)
+
+delivery_latency_seconds = Histogram(
+    "notification_gateway_delivery_latency_seconds",
+    "Time from a notification being published to Redis Pub/Sub to being"
+    " pushed down the recipient's local WebSocket",
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5),
 )
 
 

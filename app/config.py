@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     rate_limit_messages: int = 50
     rate_limit_window_seconds: int = 10
 
+    api_rate_limit_requests: int = 100
+    api_rate_limit_window_seconds: int = 10
+
     log_level: str = "INFO"
 
 

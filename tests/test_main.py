@@ -1,3 +1,4 @@
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -38,3 +39,36 @@ async def test_local_delivery_handler_pushes_to_the_matching_local_connection():
     connection_manager.send_json.assert_awaited_once_with(
         "user-1", {"type": "notification", "notification": notification}
     )
+
+
+async def test_local_delivery_handler_observes_latency_on_successful_delivery(monkeypatch):
+    observed = []
+    monkeypatch.setattr(
+        main.delivery_latency_seconds, "observe", lambda value: observed.append(value)
+    )
+
+    connection_manager = AsyncMock()
+    connection_manager.send_json.return_value = True
+    deliver = main._make_local_delivery_handler(connection_manager)
+
+    await deliver(
+        {"user_id": "user-1", "published_at": time.time() - 0.05, "notification": {"a": 1}}
+    )
+
+    assert len(observed) == 1
+    assert observed[0] >= 0.05
+
+
+async def test_local_delivery_handler_skips_latency_when_delivery_failed(monkeypatch):
+    observed = []
+    monkeypatch.setattr(
+        main.delivery_latency_seconds, "observe", lambda value: observed.append(value)
+    )
+
+    connection_manager = AsyncMock()
+    connection_manager.send_json.return_value = False
+    deliver = main._make_local_delivery_handler(connection_manager)
+
+    await deliver({"user_id": "user-1", "published_at": time.time(), "notification": {"a": 1}})
+
+    assert observed == []

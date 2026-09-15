@@ -1,4 +1,5 @@
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -11,7 +12,7 @@ from app.api.routes import auth, health, history, metrics, notifications, presen
 from app.config import get_settings
 from app.core.idempotency import IdempotencyGuard
 from app.core.logging_config import configure_logging
-from app.core.metrics import read_receipts_recorded_total
+from app.core.metrics import delivery_latency_seconds, read_receipts_recorded_total
 from app.core.rate_limiter import RateLimiter
 from app.db.connection import dispose_engine, get_session
 from app.db.repository import NotificationRepository
@@ -40,9 +41,13 @@ async def _mark_read(notification_id: UUID, user_id: str, read_at: datetime) -> 
 def _make_local_delivery_handler(connection_manager: ConnectionManager) -> MessageHandler:
     async def deliver(payload: dict) -> None:
         user_id = payload["user_id"]
-        await connection_manager.send_json(
+        delivered = await connection_manager.send_json(
             user_id, {"type": "notification", "notification": payload["notification"]}
         )
+
+        published_at = payload.get("published_at")
+        if delivered and published_at is not None:
+            delivery_latency_seconds.observe(time.time() - published_at)
 
     return deliver
 
@@ -58,6 +63,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     ticket_auth = WSTicketAuth(redis, settings.ws_ticket_ttl_seconds)
     rate_limiter = RateLimiter(
         redis, settings.rate_limit_messages, settings.rate_limit_window_seconds
+    )
+    api_rate_limiter = RateLimiter(
+        redis, settings.api_rate_limit_requests, settings.api_rate_limit_window_seconds
     )
     publisher = Publisher(redis)
     idempotency_guard = IdempotencyGuard(redis)
@@ -83,6 +91,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.presence_manager = presence_manager
     app.state.ticket_auth = ticket_auth
     app.state.rate_limiter = rate_limiter
+    app.state.api_rate_limiter = api_rate_limiter
     app.state.publisher = publisher
     app.state.idempotency_guard = idempotency_guard
     app.state.message_router = message_router

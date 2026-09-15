@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Request
+import time
+
+from fastapi import APIRouter, HTTPException, Request, status
 
 from app.core.metrics import notifications_delivered_live_total, notifications_persisted_total
 from app.db.connection import get_session
@@ -13,6 +15,13 @@ async def create_notification(
     body: NotificationCreate, request: Request
 ) -> NotificationCreateResponse:
     state = request.app.state
+
+    caller_key = request.client.host if request.client else "unknown"
+    if not await state.api_rate_limiter.allow(caller_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Rate limit exceeded for notification triggers from this caller",
+        )
 
     if await state.idempotency_guard.seen_recently(body.notification_id):
         return NotificationCreateResponse(
@@ -37,6 +46,7 @@ async def create_notification(
                 owning_instance,
                 {
                     "user_id": str(body.user_id),
+                    "published_at": time.time(),
                     "notification": {
                         "notification_id": str(row.notification_id),
                         "user_id": str(row.user_id),

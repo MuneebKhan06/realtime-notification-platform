@@ -11,6 +11,7 @@ from httpx import ASGITransport, AsyncClient
 from app.api.routes import auth, health, history, metrics, notifications, presence
 from app.config import Settings
 from app.core.idempotency import IdempotencyGuard
+from app.core.rate_limiter import RateLimiter
 from app.presence.presence_manager import PresenceManager
 from app.presence.presence_store import PresenceStore
 from app.pubsub.instance_registry import InstanceRegistry
@@ -44,6 +45,9 @@ def app(redis, settings) -> FastAPI:
     fastapi_app.state.ticket_auth = WSTicketAuth(redis, settings.ws_ticket_ttl_seconds)
     fastapi_app.state.publisher = Publisher(redis)
     fastapi_app.state.idempotency_guard = IdempotencyGuard(redis)
+    fastapi_app.state.api_rate_limiter = RateLimiter(
+        redis, settings.api_rate_limit_requests, settings.api_rate_limit_window_seconds
+    )
 
     return fastapi_app
 
@@ -164,6 +168,30 @@ async def test_create_notification_is_idempotent_for_duplicate_ids(client, app):
     assert response.status_code == 200
     assert body["persisted"] is False
     assert body["delivered_live"] is False
+
+
+async def test_create_notification_is_rate_limited_per_caller(client, app, monkeypatch):
+    app.state.api_rate_limiter = RateLimiter(app.state.redis, limit=1, window_seconds=10)
+
+    fake_repository = AsyncMock()
+    fake_repository.create.return_value = None
+    monkeypatch.setattr(notifications, "get_session", _fake_session_scope())
+    monkeypatch.setattr(notifications, "NotificationRepository", lambda session: fake_repository)
+
+    payload = {
+        "notification_id": str(uuid.uuid4()),
+        "user_id": str(uuid.uuid4()),
+        "type": "message.received",
+        "payload": {},
+    }
+
+    first = await client.post("/notifications", json=payload)
+    second = await client.post(
+        "/notifications", json={**payload, "notification_id": str(uuid.uuid4())}
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 429
 
 
 async def test_get_history_returns_notifications_for_user(client, monkeypatch):
