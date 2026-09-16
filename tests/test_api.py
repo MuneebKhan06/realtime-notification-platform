@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -77,6 +78,23 @@ async def test_health_check_reports_redis_and_instance_id(client, monkeypatch):
     assert body["instance_id"] == "instance-1"
     assert body["redis"] == "connected"
     assert body["active_connections"] == 0
+
+
+async def test_health_check_reports_unavailable_when_redis_is_slow(client, app, monkeypatch):
+    monkeypatch.setattr(health, "get_session", _fake_session_scope())
+    app.state.settings.health_check_timeout_seconds = 0.01
+
+    async def slow_ping():
+        await asyncio.sleep(1)
+
+    monkeypatch.setattr(app.state.redis, "ping", slow_ping)
+
+    response = await client.get("/health")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["redis"] == "unavailable"
+    assert body["status"] == "degraded"
 
 
 async def test_metrics_endpoint_returns_prometheus_text(client):

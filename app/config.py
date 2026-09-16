@@ -9,8 +9,12 @@ class Settings(BaseSettings):
     instance_id: str = "instance-1"
 
     database_url: str = "postgresql+asyncpg://notify:notify@localhost:5432/notifications"
+    db_pool_size: int = 10
+    db_pool_max_overflow: int = 20
+    db_pool_timeout_seconds: int = 5
 
     redis_url: str = "redis://localhost:6379/0"
+    health_check_timeout_seconds: float = 3.0
 
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
