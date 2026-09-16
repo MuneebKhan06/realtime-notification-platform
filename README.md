@@ -501,7 +501,8 @@ make check   # lint, type check, unit tests
 
 `make check` runs ruff, mypy, and the unit test suite together, the same
 checks CI runs. See the Makefile for individual targets (`lint`,
-`typecheck`, `test-unit`, `test-integration`, `up`, `down`, `migrate`).
+`typecheck`, `test-unit`, `test-integration`, `coverage`, `up`, `down`,
+`migrate`). CI also enforces a minimum 80% coverage gate on every push.
 
 Optionally install the pre-commit hooks so lint and formatting run before
 each commit:

@@ -1,10 +1,13 @@
-.PHONY: install test test-unit test-integration lint format typecheck check up down migrate
+.PHONY: install test test-unit test-integration coverage lint format typecheck check up down migrate
 
 install:
 	pip install -r requirements-dev.txt
 
 test-unit:
 	pytest tests/ -v -m "not integration"
+
+coverage:
+	pytest tests/ -m "not integration" --cov=app --cov-report=term-missing --cov-report=html
 
 test-integration:
 	docker-compose -f docker-compose.test.yml up -d --build

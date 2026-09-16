@@ -33,3 +33,14 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = ["fakeredis.*", "locust.*"]
 ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]
+fail_under = 80

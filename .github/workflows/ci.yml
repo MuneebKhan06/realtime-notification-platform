@@ -31,5 +31,5 @@ jobs:
       - name: Type check with mypy
         run: mypy app/
 
-      - name: Run unit tests
-        run: pytest tests/ -v -m "not integration"
+      - name: Run unit tests with coverage
+        run: pytest tests/ -v -m "not integration" --cov=app --cov-report=term-missing
