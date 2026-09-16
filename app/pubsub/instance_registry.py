@@ -39,7 +39,7 @@ class InstanceRegistry:
         instance_id = await self._redis.get(registry_key(user_id))
         if instance_id is None:
             return None
-        return instance_id.decode() if isinstance(instance_id, bytes) else instance_id
+        return instance_id.decode() if isinstance(instance_id, bytes) else str(instance_id)
 
     async def mark_alive(self, instance_id: str, ttl_seconds: int) -> None:
         await self._redis.set(liveness_key(instance_id), "1", ex=ttl_seconds)

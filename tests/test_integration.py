@@ -43,8 +43,8 @@ async def _get_ticket(http_base_url: str, user_id: str) -> str:
 
 
 async def test_notification_reaches_recipient_connected_to_a_different_instance():
-    user_a = f"user-{uuid.uuid4()}"
-    user_b = f"user-{uuid.uuid4()}"
+    user_a = str(uuid.uuid4())
+    user_b = str(uuid.uuid4())
 
     ticket_a = await _get_ticket(INSTANCE_1_HTTP, user_a)
     ticket_b = await _get_ticket(INSTANCE_2_HTTP, user_b)
@@ -76,7 +76,7 @@ async def test_notification_reaches_recipient_connected_to_a_different_instance(
 
 
 async def test_offline_recipient_gets_backlog_on_reconnect():
-    user_id = f"user-{uuid.uuid4()}"
+    user_id = str(uuid.uuid4())
     notification_id = str(uuid.uuid4())
 
     async with httpx.AsyncClient(base_url=INSTANCE_1_HTTP) as client:

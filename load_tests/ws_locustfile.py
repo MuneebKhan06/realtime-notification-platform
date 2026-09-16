@@ -25,7 +25,7 @@ class WebSocketUser(User):
     wait_time = between(10, 20)
 
     async def on_start(self) -> None:
-        self.user_id = f"load-{uuid.uuid4()}"
+        self.user_id = str(uuid.uuid4())
         self.connection = None
         await self._connect()
 

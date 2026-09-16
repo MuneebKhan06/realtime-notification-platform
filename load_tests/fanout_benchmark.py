@@ -33,7 +33,7 @@ async def get_ticket(http_host: str, user_id: str) -> str:
 
 
 async def run_benchmark(trigger_host: str, recv_host: str, iterations: int) -> list[float]:
-    user_id = f"bench-{uuid.uuid4()}"
+    user_id = str(uuid.uuid4())
     ticket = await get_ticket(
         recv_host.replace("ws://", "http://").replace("wss://", "https://"), user_id
     )

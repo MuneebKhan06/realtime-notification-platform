@@ -113,7 +113,9 @@ async def test_get_presence_defaults_to_offline(client):
 
 
 async def test_ws_ticket_issued_for_a_valid_bearer_token(client, settings):
-    token = jwt.encode({"sub": "user-1"}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    token = jwt.encode(
+        {"sub": str(uuid.uuid4())}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
 
     response = await client.post("/auth/ws-ticket", headers={"Authorization": f"Bearer {token}"})
 
@@ -127,6 +129,16 @@ async def test_ws_ticket_rejects_invalid_token(client):
     response = await client.post(
         "/auth/ws-ticket", headers={"Authorization": "Bearer not-a-real-token"}
     )
+
+    assert response.status_code == 401
+
+
+async def test_ws_ticket_rejects_a_non_uuid_subject_claim(client, settings):
+    token = jwt.encode(
+        {"sub": "not-a-uuid"}, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
+
+    response = await client.post("/auth/ws-ticket", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 401
 

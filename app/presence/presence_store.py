@@ -41,7 +41,7 @@ class PresenceStore:
         value = await self._redis.get(presence_key(user_id))
         if value is None:
             return "offline"
-        return value.decode() if isinstance(value, bytes) else value
+        return value.decode() if isinstance(value, bytes) else str(value)
 
     async def get_last_seen(self, user_id: str) -> datetime | None:
         value = await self._redis.get(last_seen_key(user_id))

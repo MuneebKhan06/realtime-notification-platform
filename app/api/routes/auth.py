@@ -1,3 +1,5 @@
+import uuid
+
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -29,7 +31,19 @@ def decode_user_id(request: Request, credentials: HTTPAuthorizationCredentials) 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token missing subject claim"
         )
-    return user_id
+
+    # user_id flows into the WS and REST layers as a UUID everywhere else
+    # (notification rows, the instance registry, presence keys), so a
+    # non-UUID subject claim is rejected here rather than crashing later
+    # when the backlog query tries to parse it.
+    try:
+        uuid.UUID(str(user_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token subject claim must be a UUID"
+        ) from exc
+
+    return str(user_id)
 
 
 @router.post(
