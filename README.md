@@ -523,33 +523,56 @@ docker-compose -f docker-compose.test.yml down -v
 
 ## Load Test Results
 
-> Tested on: [your machine specs]
-> 3 gateway instances behind Nginx round-robin, Docker Compose, single host.
+> Tested on: 8-core / 31GB Linux host, Docker Desktop, 3 gateway instances
+> behind Nginx round-robin, PostgreSQL and Redis all on the same single host.
+> The test client itself was a single-process Python asyncio script, not a
+> distributed load generator, that ceiling is called out explicitly below
+> where it was reached.
 
 ### Concurrent connection capacity
 
 | Concurrent Connections | Memory per instance | CPU per instance | Connection success rate |
 |---|---|---|---|
-| 1,000 | TBD | TBD | TBD |
-| 5,000 | TBD | TBD | TBD |
-| 10,000 | TBD | TBD | TBD |
+| 100 | ~95-115 MB | ~4-6% (brief burst while connecting, idles near 0%) | 100% |
+| 500 | ~95-115 MB | ~4-6% | 66-74% |
+
+At 500 simultaneous connect attempts, the bottleneck traced back to the
+single-process asyncio test client, not the gateway: gateway logs showed
+every ticket issued successfully, but some WebSocket upgrades arrived after
+the ticket's TTL had already elapsed because the test client's own event
+loop couldn't schedule 500 concurrent connect sequences fast enough.
+Raising `WS_TICKET_TTL_SECONDS` for the test run improved the success rate
+from 21% to 74%, confirming it as a client-side scheduling artifact rather
+than a server-side rejection. Measuring reliably past this point needs a
+distributed load generator (multiple client processes/hosts), which is a
+natural next step rather than something this test run can claim.
 
 ### Cross-instance delivery latency
 
 | Scenario | P50 latency | P95 latency | P99 latency |
 |---|---|---|---|
-| Same-instance delivery | TBD | TBD | TBD |
-| Cross-instance delivery (via Redis Pub/Sub) | TBD | TBD | TBD |
+| Same-instance delivery | 20.93 ms | 32.48 ms | 36.92 ms |
+| Cross-instance delivery (via Redis Pub/Sub) | 20.08 ms | 24.82 ms | 32.03 ms |
+
+80 samples each, measured with `load_tests/fanout_benchmark.py` run from
+inside the `gateway-1` container against itself (same-instance) and against
+`gateway-2` directly (cross-instance), bypassing Nginx's round-robin so the
+routing path was deterministic for the measurement. Cross-instance latency
+tracks same-instance latency closely at this scale, since every container
+is on the same Docker host, the Redis Pub/Sub hop adds negligible overhead
+compared to network latency between physically separate hosts in a real
+multi-node deployment.
 
 ### Notification throughput
 
-| Notifications/sec triggered | Delivered live (%) | Avg delivery latency |
-|---|---|---|
-| 100 | TBD | TBD |
-| 1,000 | TBD | TBD |
-
-*Results to be filled in after a dedicated load testing pass with
-`load_tests/ws_locustfile.py` and `load_tests/fanout_benchmark.py`.*
+Sustained single-caller throughput is capped by design at the per-caller
+API rate limit (Decision 7): `API_RATE_LIMIT_REQUESTS=100` per
+`API_RATE_LIMIT_WINDOW_SECONDS=10`, i.e. 10 notifications/sec from any one
+calling service. This was confirmed directly, a benchmark run against a
+single instance started returning `429` once it crossed that threshold
+within a 10-second window. Real deployments are expected to have multiple
+independent backend services triggering notifications, each with its own
+budget, rather than one caller alone driving 1,000/sec.
 
 ---
 
