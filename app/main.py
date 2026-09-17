@@ -69,7 +69,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         redis, settings.api_rate_limit_requests, settings.api_rate_limit_window_seconds
     )
     publisher = Publisher(redis)
-    idempotency_guard = IdempotencyGuard(redis)
+    idempotency_guard = IdempotencyGuard(redis, settings.idempotency_ttl_seconds)
     heartbeat_handler = HeartbeatHandler(
         presence_manager, instance_registry, settings.presence_ttl_seconds
     )

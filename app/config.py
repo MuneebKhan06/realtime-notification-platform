@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     api_rate_limit_requests: int = 100
     api_rate_limit_window_seconds: int = 10
 
+    idempotency_ttl_seconds: int = 300
+
     log_level: str = "INFO"
 
 
