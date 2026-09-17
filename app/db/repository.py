@@ -95,3 +95,12 @@ class NotificationRepository:
         stmt = stmt.order_by(Notification.created_at.desc()).limit(limit)
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_read_receipts(self, notification_id: uuid.UUID) -> list[ReadReceipt]:
+        stmt = (
+            select(ReadReceipt)
+            .where(ReadReceipt.notification_id == notification_id)
+            .order_by(ReadReceipt.read_at.asc())
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())

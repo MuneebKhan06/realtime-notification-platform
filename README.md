@@ -465,6 +465,17 @@ Paginated notification history for a user.
 `next_cursor` is `null` once fewer than `limit` rows come back. Pass it as
 the next request's `before` to page further into the history.
 
+### GET /notifications/{notification_id}/read-receipts
+
+Read receipt audit trail for a single notification, one entry per user who
+acknowledged it via a `read_receipt` WebSocket message.
+
+```json
+[
+  {"notification_id": "uuid", "user_id": "uuid", "read_at": "2026-01-01T00:00:00Z"}
+]
+```
+
 ### GET /presence/{user_id}
 
 ```json

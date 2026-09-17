@@ -377,3 +377,39 @@ async def test_get_history_rejects_a_limit_above_the_maximum(client):
     )
 
     assert response.status_code == 422
+
+
+async def test_get_read_receipts_returns_the_audit_trail(client, monkeypatch):
+    notification_id = uuid.uuid4()
+    receipt = AsyncMock()
+    receipt.notification_id = notification_id
+    receipt.user_id = uuid.uuid4()
+    receipt.read_at = datetime.now(timezone.utc)
+
+    fake_repository = AsyncMock()
+    fake_repository.get_read_receipts.return_value = [receipt]
+
+    monkeypatch.setattr(history, "get_session", _fake_session_scope())
+    monkeypatch.setattr(history, "NotificationRepository", lambda session: fake_repository)
+
+    response = await client.get(f"/notifications/{notification_id}/read-receipts")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert len(body) == 1
+    assert body[0]["notification_id"] == str(notification_id)
+    assert body[0]["user_id"] == str(receipt.user_id)
+    fake_repository.get_read_receipts.assert_awaited_once_with(notification_id)
+
+
+async def test_get_read_receipts_returns_an_empty_list_when_unread(client, monkeypatch):
+    fake_repository = AsyncMock()
+    fake_repository.get_read_receipts.return_value = []
+
+    monkeypatch.setattr(history, "get_session", _fake_session_scope())
+    monkeypatch.setattr(history, "NotificationRepository", lambda session: fake_repository)
+
+    response = await client.get(f"/notifications/{uuid.uuid4()}/read-receipts")
+
+    assert response.status_code == 200
+    assert response.json() == []
