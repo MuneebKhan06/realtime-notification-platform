@@ -253,7 +253,7 @@ async def test_create_notification_skips_delivery_to_a_registered_but_dead_insta
 
 async def test_create_notification_is_idempotent_for_duplicate_ids(client, app):
     notification_id = str(uuid.uuid4())
-    await app.state.idempotency_guard.seen_recently(uuid.UUID(notification_id))
+    await app.state.idempotency_guard.mark_seen(uuid.UUID(notification_id))
 
     response = await client.post(
         "/notifications",
@@ -269,6 +269,36 @@ async def test_create_notification_is_idempotent_for_duplicate_ids(client, app):
     assert response.status_code == 200
     assert body["persisted"] is False
     assert body["delivered_live"] is False
+
+
+async def test_create_notification_does_not_mark_seen_when_the_db_write_fails(
+    client, app, monkeypatch
+):
+    """A failed persist attempt must not block a legitimate retry.
+
+    Marking the id "seen" only happens after Postgres confirms the actual
+    outcome, so a caller retrying after a transient DB error still reaches
+    the database again instead of getting a false persisted=False forever.
+    """
+    notification_id = str(uuid.uuid4())
+
+    fake_repository = AsyncMock()
+    fake_repository.create.side_effect = RuntimeError("connection reset")
+    monkeypatch.setattr(notifications, "get_session", _fake_session_scope())
+    monkeypatch.setattr(notifications, "NotificationRepository", lambda session: fake_repository)
+
+    with pytest.raises(RuntimeError):
+        await client.post(
+            "/notifications",
+            json={
+                "notification_id": notification_id,
+                "user_id": str(uuid.uuid4()),
+                "type": "message.received",
+                "payload": {},
+            },
+        )
+
+    assert await app.state.idempotency_guard.has_seen(uuid.UUID(notification_id)) is False
 
 
 async def test_create_notification_is_rate_limited_per_caller(client, app, monkeypatch):

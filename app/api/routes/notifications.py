@@ -27,7 +27,7 @@ async def create_notification(
             detail="Rate limit exceeded for notification triggers from this caller",
         )
 
-    if await state.idempotency_guard.seen_recently(body.notification_id):
+    if await state.idempotency_guard.has_seen(body.notification_id):
         return NotificationCreateResponse(
             notification_id=body.notification_id, persisted=False, delivered_live=False
         )
@@ -35,6 +35,12 @@ async def create_notification(
     async with get_session() as session:
         repository = NotificationRepository(session)
         row = await repository.create(body.notification_id, body.user_id, body.type, body.payload)
+
+        # Only mark seen once Postgres has confirmed the outcome, a fresh
+        # insert or a unique-constraint conflict are both a real answer,
+        # an exception before this point leaves nothing marked, so the
+        # caller's retry is free to try the write again.
+        await state.idempotency_guard.mark_seen(body.notification_id)
 
         if row is None:
             return NotificationCreateResponse(
