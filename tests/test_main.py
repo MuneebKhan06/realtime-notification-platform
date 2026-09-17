@@ -29,6 +29,36 @@ async def test_mark_read_forwards_notification_user_and_timestamp_to_the_reposit
     fake_repository.mark_read.assert_awaited_once_with(notification_id, uuid.UUID(user_id), read_at)
 
 
+async def test_mark_read_records_the_metric_only_when_a_notification_was_actually_marked(
+    monkeypatch,
+):
+    fake_repository = AsyncMock()
+    fake_repository.mark_read.return_value = True
+    monkeypatch.setattr(main, "get_session", _fake_session_scope())
+    monkeypatch.setattr(main, "NotificationRepository", lambda session: fake_repository)
+
+    incremented = []
+    monkeypatch.setattr(main.read_receipts_recorded_total, "inc", lambda: incremented.append(1))
+
+    await main._mark_read(uuid.uuid4(), str(uuid.uuid4()), datetime.now(timezone.utc))
+
+    assert incremented == [1]
+
+
+async def test_mark_read_skips_the_metric_when_nothing_was_marked(monkeypatch):
+    fake_repository = AsyncMock()
+    fake_repository.mark_read.return_value = False
+    monkeypatch.setattr(main, "get_session", _fake_session_scope())
+    monkeypatch.setattr(main, "NotificationRepository", lambda session: fake_repository)
+
+    incremented = []
+    monkeypatch.setattr(main.read_receipts_recorded_total, "inc", lambda: incremented.append(1))
+
+    await main._mark_read(uuid.uuid4(), str(uuid.uuid4()), datetime.now(timezone.utc))
+
+    assert incremented == []
+
+
 async def test_local_delivery_handler_pushes_to_the_matching_local_connection():
     connection_manager = AsyncMock()
     deliver = main._make_local_delivery_handler(connection_manager)

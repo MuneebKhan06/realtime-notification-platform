@@ -12,6 +12,7 @@ through instance-1's REST API arrives on B's socket, which instance-1 never
 holds a direct connection to.
 """
 
+import asyncio
 import json
 import uuid
 
@@ -98,3 +99,49 @@ async def test_offline_recipient_gets_backlog_on_reconnect():
         assert backlog["type"] == "backlog"
         notification_ids = [n["notification_id"] for n in backlog["notifications"]]
         assert notification_id in notification_ids
+
+
+async def test_read_receipt_is_scoped_to_the_owning_user():
+    owner = str(uuid.uuid4())
+    intruder = str(uuid.uuid4())
+    notification_id = str(uuid.uuid4())
+
+    async with httpx.AsyncClient(base_url=INSTANCE_1_HTTP) as client:
+        response = await client.post(
+            "/notifications",
+            json={
+                "notification_id": notification_id,
+                "user_id": owner,
+                "type": "message.received",
+                "payload": {},
+            },
+        )
+        response.raise_for_status()
+
+        # A different, unrelated user tries to mark the owner's notification
+        # as read. This must be silently ignored rather than corrupting the
+        # owner's unread backlog.
+        intruder_ticket = await _get_ticket(INSTANCE_1_HTTP, intruder)
+        async with websockets.connect(f"{INSTANCE_1_WS}/ws?ticket={intruder_ticket}") as ws:
+            await ws.recv()  # backlog
+            await ws.send(json.dumps({"type": "read_receipt", "notification_id": notification_id}))
+            # read_receipt has no response frame, give the server a moment
+            # to finish the DB write before asserting against it below.
+            await asyncio.sleep(0.5)
+
+        response = await client.get(f"/notifications/{notification_id}/read-receipts")
+        response.raise_for_status()
+        assert response.json() == []
+
+        # The actual owner marks it read, which must succeed.
+        owner_ticket = await _get_ticket(INSTANCE_1_HTTP, owner)
+        async with websockets.connect(f"{INSTANCE_1_WS}/ws?ticket={owner_ticket}") as ws:
+            await ws.recv()  # backlog
+            await ws.send(json.dumps({"type": "read_receipt", "notification_id": notification_id}))
+            await asyncio.sleep(0.5)
+
+        response = await client.get(f"/notifications/{notification_id}/read-receipts")
+        response.raise_for_status()
+        receipts = response.json()
+        assert len(receipts) == 1
+        assert receipts[0]["user_id"] == owner

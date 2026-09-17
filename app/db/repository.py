@@ -49,20 +49,35 @@ class NotificationRepository:
 
     async def mark_read(
         self, notification_id: uuid.UUID, user_id: uuid.UUID, read_at: datetime
-    ) -> None:
+    ) -> bool:
         """Marks a notification as read and records a read receipt for it.
+
+        Scoped to the calling user_id as well as notification_id: without
+        that check, any connected client could mark an arbitrary
+        notification_id as read and pollute a different user's unread
+        backlog, since notification_id alone is not a secret.
 
         Both writes happen in one transaction: the notification's read_at is
         the fast-path check used by the unread backlog query, while the
         read_receipts row is the durable, per-user audit trail of when it
-        was acknowledged.
+        was acknowledged. The read_receipts row is only written if the
+        notification actually belongs to this user.
+
+        Returns whether a matching notification was found and marked read.
         """
         update_stmt = (
             update(Notification)
-            .where(Notification.notification_id == notification_id)
+            .where(
+                Notification.notification_id == notification_id,
+                Notification.user_id == user_id,
+            )
             .values(read_at=read_at)
         )
-        await self._session.execute(update_stmt)
+        result = await self._session.execute(update_stmt)
+
+        if result.rowcount == 0:
+            await self._session.commit()
+            return False
 
         insert_stmt = pg_insert(ReadReceipt).values(
             notification_id=notification_id,
@@ -72,6 +87,7 @@ class NotificationRepository:
         await self._session.execute(insert_stmt)
 
         await self._session.commit()
+        return True
 
     async def get_unread_backlog(self, user_id: uuid.UUID, limit: int) -> list[Notification]:
         stmt = (

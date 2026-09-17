@@ -35,8 +35,9 @@ logger = logging.getLogger(__name__)
 async def _mark_read(notification_id: UUID, user_id: str, read_at: datetime) -> None:
     async with get_session() as session:
         repository = NotificationRepository(session)
-        await repository.mark_read(notification_id, UUID(user_id), read_at)
-    read_receipts_recorded_total.inc()
+        marked = await repository.mark_read(notification_id, UUID(user_id), read_at)
+    if marked:
+        read_receipts_recorded_total.inc()
 
 
 def _make_local_delivery_handler(connection_manager: ConnectionManager) -> MessageHandler:
