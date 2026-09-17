@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
-from app.api.middleware import RequestLoggingMiddleware
+from app.api.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
 from app.api.routes import auth, health, history, metrics, notifications, presence
 from app.config import get_settings
 from app.core.idempotency import IdempotencyGuard
@@ -147,6 +147,7 @@ def create_app() -> FastAPI:
         openapi_tags=OPENAPI_TAGS,
     )
 
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestLoggingMiddleware)
 
     app.include_router(gateway_router, tags=["websocket"])

@@ -3,12 +3,27 @@ import logging
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from app.api.middleware import REQUEST_ID_HEADER, RequestLoggingMiddleware
+from app.api.middleware import (
+    REQUEST_ID_HEADER,
+    RequestLoggingMiddleware,
+    SecurityHeadersMiddleware,
+)
 
 
 def make_app() -> FastAPI:
     app = FastAPI()
     app.add_middleware(RequestLoggingMiddleware)
+
+    @app.get("/ping")
+    async def ping() -> dict:
+        return {"pong": True}
+
+    return app
+
+
+def make_app_with_security_headers() -> FastAPI:
+    app = FastAPI()
+    app.add_middleware(SecurityHeadersMiddleware)
 
     @app.get("/ping")
     async def ping() -> dict:
@@ -53,3 +68,22 @@ def test_request_is_logged_with_structured_fields(caplog):
     assert record.path == "/ping"
     assert record.status_code == 200
     assert record.duration_ms >= 0
+
+
+def test_security_headers_are_present_on_every_response():
+    client = TestClient(make_app_with_security_headers())
+
+    response = client.get("/ping")
+
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert "geolocation=()" in response.headers["Permissions-Policy"]
+
+
+def test_security_headers_do_not_include_hsts():
+    client = TestClient(make_app_with_security_headers())
+
+    response = client.get("/ping")
+
+    assert "Strict-Transport-Security" not in response.headers

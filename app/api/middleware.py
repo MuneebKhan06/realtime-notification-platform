@@ -43,3 +43,27 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         )
 
         return response
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Adds baseline security headers to every REST response.
+
+    Scoped to what is safe to set unconditionally for a JSON API with no
+    server-rendered HTML: HSTS is deliberately left out, this project's
+    Nginx layer does not terminate TLS itself (see the README's scaling
+    notes), and sending HSTS over plain HTTP risks the client caching an
+    HTTPS-only policy for a host that cannot yet serve it.
+    """
+
+    _HEADERS = {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "no-referrer",
+        "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+    }
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        response = await call_next(request)
+        for name, value in self._HEADERS.items():
+            response.headers[name] = value
+        return response
